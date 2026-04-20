@@ -18,8 +18,8 @@ COPY npm-shrinkwrap.json* ./
 COPY tsconfig*.json ./
 COPY vite.config.ts ./
 
-# Installer TOUTES les dépendances (dev incluses, nécessaires pour le build Vite)
-# npm install est compatible avec npm-shrinkwrap.json contrairement à npm ci
+# Installer TOUTES les dependances (dev incluses, necessaires pour le build Vite)
+# npm install est compatible avec npm-shrinkwrap.json contrairement a npm ci
 RUN npm install
 
 # Copier le code source
@@ -28,7 +28,7 @@ COPY public/ ./public/
 COPY index.html ./
 
 # Copier le SDK local (requis par src/components/AgentRunnerSDK.tsx)
-# Import: "../../sdk/src/ClaraFlowRunner" → dossier sdk/ à la racine du projet
+# Import: "../../sdk/src/ClaraFlowRunner" -> dossier sdk/ a la racine du projet
 COPY sdk/ ./sdk/
 
 # Build de production
@@ -38,16 +38,20 @@ ENV NODE_ENV=${NODE_ENV}
 RUN npm run build
 
 # ============================================
-# STAGE 2: Production avec Nginx
+# STAGE 2: Production avec Nginx + PORT dynamique Zeabur
 # ============================================
 FROM nginx:alpine
 
-# Copier les fichiers buildés depuis le stage builder
+# gettext fournit envsubst pour resoudre $PORT dans le template nginx au demarrage
+RUN apk add --no-cache gettext
+
+# Copier les fichiers buildes depuis le stage builder
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Configuration Nginx optimisée pour React SPA
+# Template nginx avec ${PORT} qui sera substitue dynamiquement
+# Zeabur injecte son propre $PORT - ne jamais coder 80 en dur
 RUN printf 'server {\n\
-    listen 80;\n\
+    listen ${PORT};\n\
     server_name _;\n\
     root /usr/share/nginx/html;\n\
     index index.html;\n\
@@ -61,27 +65,33 @@ RUN printf 'server {\n\
     add_header X-Content-Type-Options "nosniff" always;\n\
     add_header X-XSS-Protection "1; mode=block" always;\n\
 \n\
-    # React Router - renvoie toujours index.html\n\
     location / {\n\
         try_files $uri $uri/ /index.html;\n\
     }\n\
 \n\
-    # Cache long terme pour les assets statiques\n\
     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {\n\
         expires 1y;\n\
         add_header Cache-Control "public, immutable";\n\
     }\n\
 \n\
-    # Health check endpoint\n\
     location /health {\n\
         access_log off;\n\
-        return 200 "healthy\n";\n\
+        return 200 "healthy";\n\
         add_header Content-Type text/plain;\n\
     }\n\
-}\n' > /etc/nginx/conf.d/default.conf
+}\n' > /etc/nginx/conf.d/default.conf.template
 
-# Exposer le port 80
-EXPOSE 80
+# Script de demarrage :
+# 1. Lit $PORT injecte par Zeabur (defaut 8080 si absent)
+# 2. Resout le template nginx avec envsubst
+# 3. Lance nginx en foreground
+RUN printf '#!/bin/sh\n\
+export PORT=${PORT:-8080}\n\
+echo "[claraverse] Nginx demarre sur le port $PORT"\n\
+envsubst "${PORT}" < /etc/nginx/conf.d/default.conf.template > /etc/nginx/conf.d/default.conf\n\
+exec nginx -g "daemon off;"\n' > /start.sh && chmod +x /start.sh
 
-# Démarrer Nginx
-CMD ["nginx", "-g", "daemon off;"]
+# Port par defaut pour Zeabur (sera override par $PORT au runtime)
+EXPOSE 8080
+
+CMD ["/start.sh"]

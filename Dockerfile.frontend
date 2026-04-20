@@ -25,9 +25,6 @@ COPY src/ ./src/
 COPY public/ ./public/
 COPY index.html ./
 
-# Copier le SDK local si présent (optionnel)
-COPY sdk/ ./sdk/ || true
-
 # Build de production
 ARG NODE_ENV=production
 ENV NODE_ENV=${NODE_ENV}

@@ -5,23 +5,25 @@ FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-# Copier les fichiers de configuration
+# Copier les fichiers de configuration npm
 COPY package*.json ./
-COPY tsconfig*.json ./
-COPY vite.config.ts ./
-COPY index.html ./
 
 # Installer les dépendances
 RUN npm install
+
+# Copier les fichiers de configuration TypeScript/Vite
+COPY tsconfig*.json ./
+COPY vite.config.ts ./
+COPY index.html ./
 
 # Copier le code source
 COPY src/ ./src/
 COPY public/ ./public/
 
-# Copier le SDK si nécessaire
+# Copier le SDK si présent (optionnel)
 COPY sdk/ ./sdk/ 2>/dev/null || true
 
-# Build avec configuration correcte
+# Build de production avec variables d'environnement
 ENV NODE_ENV=production
 ENV VITE_APP_NAME=Claraverse
 ENV VITE_BACKEND_URL=https://pybackend.zeabur.app
@@ -29,21 +31,21 @@ ENV VITE_BACKEND_URL=https://pybackend.zeabur.app
 RUN npm run build
 
 # ============================================
-# STAGE 2: Nginx avec configuration optimale
+# STAGE 2: Production avec Nginx
 # ============================================
 FROM nginx:alpine
 
-# Copier les fichiers buildés
+# Copier les fichiers buildés depuis le stage builder
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Configuration Nginx CORRIGÉE pour React SPA
+# Configuration Nginx optimisée pour React SPA
 RUN echo 'server {\n\
     listen 80;\n\
     server_name _;\n\
     root /usr/share/nginx/html;\n\
     index index.html;\n\
 \n\
-    # Compression\n\
+    # Compression gzip\n\
     gzip on;\n\
     gzip_vary on;\n\
     gzip_min_length 1024;\n\
@@ -54,7 +56,7 @@ RUN echo 'server {\n\
     add_header X-Content-Type-Options "nosniff" always;\n\
     add_header X-XSS-Protection "1; mode=block" always;\n\
 \n\
-    # Servir les fichiers statiques avec cache\n\
+    # Servir les fichiers statiques avec cache long terme\n\
     location ~* \\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {\n\
         expires 1y;\n\
         add_header Cache-Control "public, immutable";\n\
@@ -67,7 +69,7 @@ RUN echo 'server {\n\
         add_header Cache-Control "no-cache";\n\
     }\n\
 \n\
-    # Health check\n\
+    # Health check endpoint\n\
     location /health {\n\
         access_log off;\n\
         return 200 "healthy\\n";\n\

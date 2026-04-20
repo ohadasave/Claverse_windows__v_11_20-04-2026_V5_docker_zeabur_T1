@@ -5,36 +5,75 @@ FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-# Copier package files
+# Copier les fichiers de configuration
 COPY package*.json ./
+COPY tsconfig*.json ./
+COPY vite.config.ts ./
+COPY index.html ./
 
 # Installer les dépendances
 RUN npm install
 
 # Copier le code source
-COPY . .
+COPY src/ ./src/
+COPY public/ ./public/
 
-# Build de production
+# Copier le SDK si nécessaire
+COPY sdk/ ./sdk/ 2>/dev/null || true
+
+# Build avec configuration correcte
 ENV NODE_ENV=production
+ENV VITE_APP_NAME=Claraverse
+ENV VITE_BACKEND_URL=https://pybackend.zeabur.app
+
 RUN npm run build
 
 # ============================================
-# STAGE 2: Production avec Nginx
+# STAGE 2: Nginx avec configuration optimale
 # ============================================
 FROM nginx:alpine
 
 # Copier les fichiers buildés
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Configuration Nginx pour React SPA
+# Configuration Nginx CORRIGÉE pour React SPA
 RUN echo 'server {\n\
     listen 80;\n\
+    server_name _;\n\
     root /usr/share/nginx/html;\n\
     index index.html;\n\
+\n\
+    # Compression\n\
+    gzip on;\n\
+    gzip_vary on;\n\
+    gzip_min_length 1024;\n\
+    gzip_types text/plain text/css text/xml text/javascript application/javascript application/json application/xml+rss image/svg+xml;\n\
+\n\
+    # Headers de sécurité\n\
+    add_header X-Frame-Options "SAMEORIGIN" always;\n\
+    add_header X-Content-Type-Options "nosniff" always;\n\
+    add_header X-XSS-Protection "1; mode=block" always;\n\
+\n\
+    # Servir les fichiers statiques avec cache\n\
+    location ~* \\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {\n\
+        expires 1y;\n\
+        add_header Cache-Control "public, immutable";\n\
+        try_files $uri =404;\n\
+    }\n\
+\n\
+    # React Router - IMPORTANT: toujours renvoyer index.html\n\
     location / {\n\
         try_files $uri $uri/ /index.html;\n\
+        add_header Cache-Control "no-cache";\n\
     }\n\
-}' > /etc/nginx/conf.d/default.conf
+\n\
+    # Health check\n\
+    location /health {\n\
+        access_log off;\n\
+        return 200 "healthy\\n";\n\
+        add_header Content-Type text/plain;\n\
+    }\n\
+}\n' > /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 

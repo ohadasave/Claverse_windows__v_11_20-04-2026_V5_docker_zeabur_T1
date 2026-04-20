@@ -268,6 +268,8 @@ Cette documentation est basée sur une expérience réelle. Si vous rencontrez d
 | 21/03/26 | 75 MB | HTTP 408 | Compression désactivée | README.md |
 | 21/03/26 | 75 MB | Curl 55 | Timeouts augmentés | PROBLEMES_RENCONTRES.md |
 | 28/03/26 | 107 MB | HTTP 408 | GitHub Desktop/SSH | SOLUTION_PROJET_107MB_28_MARS_2026.md |
+| 16/04/26 | 140 MB | HTTP 408 | Commits multiples | SOLUTION_PROJET_140MB_16_AVRIL_2026.md |
+| 20/04/26 | 2.2 GB | HTTP 408 | Config optimale + Fusion | SOLUTION_PROJET_2.2GB_20_AVRIL_2026.md ⭐ |
 
 ---
 

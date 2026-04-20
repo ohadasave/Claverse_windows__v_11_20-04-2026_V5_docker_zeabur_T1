@@ -27,6 +27,10 @@ COPY src/ ./src/
 COPY public/ ./public/
 COPY index.html ./
 
+# Copier le SDK local (requis par src/components/AgentRunnerSDK.tsx)
+# Import: "../../sdk/src/ClaraFlowRunner" → dossier sdk/ à la racine du projet
+COPY sdk/ ./sdk/
+
 # Build de production
 ARG NODE_ENV=production
 ENV NODE_ENV=${NODE_ENV}
